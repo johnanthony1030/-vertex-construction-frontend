@@ -1,0 +1,25 @@
+name: construction_app
+description: "A professional Enterprise Construction Application."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  http: ^1.6.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  # This explicitly tells your app to look inside your physical assets folder
+  assets:
+    - assets/construction_hero.jpg
