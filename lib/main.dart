@@ -101,7 +101,6 @@ class _EnterpriseSplashScreenState extends State<EnterpriseSplashScreen> {
     );
   }
 }
-
 class MainEnterpriseDashboard extends StatefulWidget {
   const MainEnterpriseDashboard({super.key});
 
@@ -110,15 +109,16 @@ class MainEnterpriseDashboard extends StatefulWidget {
 }
 
 class _MainEnterpriseDashboardState extends State<MainEnterpriseDashboard> {
-  // 🔗 VERIFIED ABSOLUTE CLOUD LINK ENDPOINT ENTRY ROOT
   final String apiEndpoint = "https://vertex-construction-api.onrender.com";
-  
   List projects = [];
   bool isLoading = true;
   bool hasError = false;
   int _activeTabIndex = 0;
 
-  // Map Telemetry State Variables
+  bool _isShowingEmergencyBanner = false;
+  String _alertForemanName = "";
+  String _alertDetails = "";
+
   String _selectedMapNode = "Lagos";
   String _mapProjectName = "Eko Atlantic High-Rise Base";
   String _mapBudget = "₦15,000,000.00";
@@ -192,6 +192,30 @@ class _MainEnterpriseDashboardState extends State<MainEnterpriseDashboard> {
     }
   }
 
+  void _submitSupportTicket() {
+    if (_ticketFormKey.currentState!.validate()) {
+      FocusScope.of(context).unfocus();
+      
+      final String inputName = _foremanController.text.trim();
+      final String inputDetails = _detailsController.text.trim();
+
+      if (_selectedPriority == 'High / Critical') {
+        setState(() {
+          _isShowingEmergencyBanner = true;
+          _alertForemanName = inputName;
+          _alertDetails = inputDetails;
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('📡 Support log recorded successfully (Priority: $_selectedPriority)')),
+        );
+      }
+      
+      _foremanController.clear();
+      _detailsController.clear();
+    }
+  }
+
   void _updateMapTelemetry(String node, String project, String budget, String geo) {
     setState(() {
       _selectedMapNode = node;
@@ -241,7 +265,41 @@ class _MainEnterpriseDashboardState extends State<MainEnterpriseDashboard> {
           BottomNavigationBarItem(icon: Icon(Icons.assignment), label: 'Reports'),
         ],
       ) : null,
-      body: _buildSelectedTabScreen(isDesktop),
+      body: Stack(
+        children: [
+          _buildSelectedTabScreen(isDesktop),
+          if (_isShowingEmergencyBanner)
+            Positioned(
+              top: 0, left: 0, right: 0,
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                color: Colors.redAccent,
+                child: SafeArea(
+                  child: Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 28),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('🚨 CRITICAL FIELD EMERGENCY: $_alertForemanName', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                            const SizedBox(height: 2),
+                            Text(_alertDetails, style: const TextStyle(color: Colors.white, fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white),
+                        onPressed: () => setState(() => _isShowingEmergencyBanner = false),
+                      )
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
@@ -291,7 +349,7 @@ class _MainEnterpriseDashboardState extends State<MainEnterpriseDashboard> {
                 children: [
                   _buildProjectSection(),
                   const SizedBox(height: 25),
-                  _buildInteractiveMapWidget(), // 🗺️ SYSTEM PLOTTING INJECTED RIGHT INTO THE FLOW
+                  _buildInteractiveMapWidget(), 
                   const SizedBox(height: 30),
                   _buildAdminInputFormSection(), 
                   const SizedBox(height: 30),
@@ -335,22 +393,44 @@ class _MainEnterpriseDashboardState extends State<MainEnterpriseDashboard> {
               final project = projects[index];
               return Container(
                 margin: const EdgeInsets.only(bottom: 15),
-                padding: const EdgeInsets.all(15),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 4))]),
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const CircleAvatar(backgroundColor: Color(0xFFF2B705), child: Icon(Icons.architecture, color: Color(0xFF1E293B))),
-                  title: Text(project['name'] ?? 'Active Operation', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1E293B))),
-                  subtitle: Padding(
-                    padding: const EdgeInsets.only(top: 8.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(children: [const Icon(Icons.location_on, size: 14, color: Colors.grey), const SizedBox(width: 6), Expanded(child: Text(project['location'] ?? 'N/A', style: const TextStyle(fontSize: 13)))]),
-                        const SizedBox(height: 6),
-                        Row(children: [const Icon(Icons.payments, size: 14, color: Colors.green), const SizedBox(width: 6), Text('Budget: ₦${project['budget'] ?? '0.00'}', style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.green, fontSize: 13))]),
-                      ],
-                    ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 4))],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Column(
+                    children: [
+                      Image.asset(
+                        'assets/construction_hero.jpg', 
+                        height: 140, 
+                        width: double.infinity, 
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            height: 140,
+                            color: const Color(0xFF1E293B).withOpacity(0.05),
+                            child: const Center(child: Icon(Icons.image_not_supported, color: Colors.grey)),
+                          );
+                        },
+                      ),
+                      ListTile(
+                        contentPadding: const EdgeInsets.all(15),
+                        title: Text(project['name'] ?? 'Active Operation', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1E293B))),
+                        subtitle: Padding(
+                          padding: const EdgeInsets.only(top: 8.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(children: [const Icon(Icons.location_on, size: 14, color: Colors.grey), const SizedBox(width: 6), Expanded(child: Text(project['location'] ?? 'N/A', style: const TextStyle(fontSize: 13)))]),
+                              const SizedBox(height: 6),
+                              Row(children: [const Icon(Icons.payments, size: 14, color: Colors.green), const SizedBox(width: 6), Text('Budget: ₦${project['budget'] ?? '0.00'}', style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.green, fontSize: 13))]),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               );
@@ -360,7 +440,6 @@ class _MainEnterpriseDashboardState extends State<MainEnterpriseDashboard> {
     );
   }
 
-  // ⭐ HIGH-END INTERACTIVE MAPPING COMPONENT SYSTEM OVER NIGERIAN SECTORS
   Widget _buildInteractiveMapWidget() {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -499,6 +578,7 @@ class _MainEnterpriseDashboardState extends State<MainEnterpriseDashboard> {
             const Text('Field Support & Incidents', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
             const SizedBox(height: 20),
             TextFormField(
+              controller: _foremanController,
               decoration: const InputDecoration(labelText: 'Foreman Name', border: OutlineInputBorder(), prefixIcon: Icon(Icons.person)),
               validator: (v) => v!.isEmpty ? 'Enter manager name' : null,
             ),
@@ -511,6 +591,7 @@ class _MainEnterpriseDashboardState extends State<MainEnterpriseDashboard> {
             ),
             const SizedBox(height: 15),
             TextFormField(
+              controller: _detailsController,
               maxLines: 3,
               decoration: const InputDecoration(labelText: 'Log Event Details', border: OutlineInputBorder()),
               validator: (v) => v!.isEmpty ? 'Describe the site issue' : null,
@@ -520,7 +601,7 @@ class _MainEnterpriseDashboardState extends State<MainEnterpriseDashboard> {
               width: double.infinity,
               height: 48,
               child: ElevatedButton(
-                onPressed: () {},
+                onPressed: _submitSupportTicket,
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1E293B), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
                 child: const Text('TRANSMIT REPORT TO BASE', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5, fontSize: 13)),
               ),

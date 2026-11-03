@@ -23,3 +23,8 @@ flutter:
   # This explicitly tells your app to look inside your physical assets folder
   assets:
     - assets/construction_hero.jpg
+
+
+# 🚀 AIRLINE OTA LIVE PATCH HANDSHAKE TAG
+shorebird:
+  app_id: 8b73f8a4-0c2d-4e9b-b5a1-7c93e4d01030
