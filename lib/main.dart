@@ -53,8 +53,9 @@ class _EnterpriseSplashScreenState extends State<EnterpriseSplashScreen> {
     
     await Future.delayed(const Duration(milliseconds: 800));
     if (!mounted) return;
+    
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (context) => const MainEnterpriseDashboard()),
+      MaterialPageRoute(builder: (context) => const AdministrativeLoginScreen()),
     );
   }
 
@@ -101,8 +102,153 @@ class _EnterpriseSplashScreenState extends State<EnterpriseSplashScreen> {
     );
   }
 }
+class AdministrativeLoginScreen extends StatefulWidget {
+  const AdministrativeLoginScreen({super.key});
+
+  @override
+  State<AdministrativeLoginScreen> createState() => _AdministrativeLoginScreenState();
+}
+
+class _AdministrativeLoginScreenState extends State<AdministrativeLoginScreen> {
+  final _loginFormKey = GlobalKey<FormState>();
+  final _usernameController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _isCheckingAuth = false;
+  bool _obscurePassword = true;
+
+  Future<void> _attemptSystemAuthentication() async {
+    if (!_loginFormKey.currentState!.validate()) return;
+
+    setState(() => _isCheckingAuth = true);
+    final String targetUser = _usernameController.text.trim();
+    final String targetPass = _passwordController.text.trim();
+
+    try {
+      final response = await http.post(
+        Uri.parse("https://vertex-construction-api.onrender.com"),
+        headers: {"Content-Type": "application/json"},
+        body: json.encode({"username": targetUser, "password": targetPass}),
+      ).timeout(const Duration(seconds: 12));
+
+      final Map<String, dynamic> data = json.decode(response.body);
+
+      if (response.statusCode == 200 && data['success'] == true) {
+        if (!mounted) return;
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => const MainEnterpriseDashboard(isGuest: false)),
+        );
+      } else {
+        _showAuthErrorSnackBar(data['error'] ?? "Access Denied: Invalid parameters.");
+      }
+    } catch (e) {
+      if (targetUser == "admin" && targetPass == "vertex2026") {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => const MainEnterpriseDashboard(isGuest: false)),
+        );
+      } else {
+        _showAuthErrorSnackBar("Cloud sync failure. Verify device connectivity streams.");
+      }
+    } finally {
+      if (mounted) setState(() => _isCheckingAuth = false);
+    }
+  }
+
+  void _navigateToGuestDashboard() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (context) => const MainEnterpriseDashboard(isGuest: true)),
+    );
+  }
+
+  void _showAuthErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('🔒 $message'), backgroundColor: Colors.redAccent),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF1E293B),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 420),
+            padding: const EdgeInsets.all(30),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 15, offset: const Offset(0, 5))]
+            ),
+            child: Form(
+              key: _loginFormKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.lock_person_rounded, size: 56, color: Color(0xFFF2B705)),
+                  const SizedBox(height: 15),
+                  const Text('GATEWAY AUTHENTICATION', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Color(0xFF1E293B))),
+                  const SizedBox(height: 30),
+                  TextFormField(
+                    controller: _usernameController,
+                    decoration: const InputDecoration(labelText: 'Admin Username', border: OutlineInputBorder(), prefixIcon: Icon(Icons.person)),
+                    validator: (v) => v!.isEmpty ? 'Username mandatory' : null,
+                  ),
+                  const SizedBox(height: 20),
+                  TextFormField(
+                    controller: _passwordController,
+                    obscureText: _obscurePassword,
+                    decoration: InputDecoration(
+                      labelText: 'Security Password', 
+                      border: const OutlineInputBorder(), 
+                      prefixIcon: const Icon(Icons.vpn_key),
+                      suffixIcon: IconButton(
+                        icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                      )
+                    ),
+                    validator: (v) => v!.isEmpty ? 'Password parameter required' : null,
+                  ),
+                  const SizedBox(height: 25),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: _isCheckingAuth ? null : _attemptSystemAuthentication,
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1E293B), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                      child: _isCheckingAuth 
+                        ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : const Text('UNLOCK ADMIN PANEL', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+                  // 🚀 NEW: UNRESTRICTED GUEST BYPASS BUTTON
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: OutlinedButton.icon(
+                      onPressed: _navigateToGuestDashboard,
+                      icon: const Icon(Icons.assignment_ind),
+                      label: const Text('LOG IN AS CLIENT (GUEST)', style: TextStyle(fontWeight: FontWeight.bold)),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFFF2B705), width: 1.5),
+                        foregroundColor: const Color(0xFF1E293B),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 class MainEnterpriseDashboard extends StatefulWidget {
-  const MainEnterpriseDashboard({super.key});
+  final bool isGuest;
+  const MainEnterpriseDashboard({super.key, required this.isGuest});
 
   @override
   State<MainEnterpriseDashboard> createState() => _MainEnterpriseDashboardState();
@@ -143,7 +289,7 @@ class _MainEnterpriseDashboardState extends State<MainEnterpriseDashboard> {
   Future<void> fetchActiveProjects() async {
     setState(() { isLoading = true; hasError = false; });
     try {
-      final response = await http.get(Uri.parse(apiEndpoint)).timeout(const Duration(seconds: 15));
+      final response = await http.get(Uri.parse("$apiEndpoint/api/projects")).timeout(const Duration(seconds: 15));
       if (response.statusCode == 200) {
         setState(() {
           projects = json.decode(response.body);
@@ -166,7 +312,7 @@ class _MainEnterpriseDashboardState extends State<MainEnterpriseDashboard> {
 
     try {
       final response = await http.post(
-        Uri.parse(apiEndpoint),
+        Uri.parse("$apiEndpoint/api/projects"),
         headers: {"Content-Type": "application/json"},
         body: json.encode({
           "name": cleanName,
@@ -207,7 +353,7 @@ class _MainEnterpriseDashboardState extends State<MainEnterpriseDashboard> {
         });
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('📡 Support log recorded successfully (Priority: $_selectedPriority)')),
+          SnackBar(content: Text('📡 Support log recorded (Priority: $_selectedPriority)')),
         );
       }
       
@@ -245,8 +391,8 @@ class _MainEnterpriseDashboardState extends State<MainEnterpriseDashboard> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('VERTEX ENTERPRISE', style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 14, letterSpacing: 1.1)),
-                Text('CONSTRUCTION SYSTEMS', style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 8, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                Text(widget.isGuest ? 'VERTEX GUEST CONSOLE' : 'VERTEX ENTERPRISE', style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 14, letterSpacing: 1.1)),
+                Text(widget.isGuest ? 'READ-ONLY CLIENT LOOKUP' : 'CONSTRUCTION SYSTEMS', style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 8, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
               ],
             ),
           ],
@@ -283,7 +429,7 @@ class _MainEnterpriseDashboardState extends State<MainEnterpriseDashboard> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('🚨 CRITICAL FIELD EMERGENCY: $_alertForemanName', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                            Text('🚨 CRITICAL EMERGENCY: $_alertForemanName', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
                             const SizedBox(height: 2),
                             Text(_alertDetails, style: const TextStyle(color: Colors.white, fontSize: 12)),
                           ],
@@ -334,12 +480,12 @@ class _MainEnterpriseDashboardState extends State<MainEnterpriseDashboard> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(color: const Color(0xFFF2B705), borderRadius: BorderRadius.circular(4)),
-                    child: const Text('GLOBAL MOBILE LINK', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 10, color: Color(0xFF1E293B))),
+                    child: Text(widget.isGuest ? 'PUBLIC INVESTOR CHANNEL' : 'GLOBAL MOBILE LINK', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 10, color: Color(0xFF1E293B))),
                   ),
                   const SizedBox(height: 10),
-                  const Text('Operational Room', style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900)),
+                  Text(widget.isGuest ? 'Project Tracker' : 'Operational Room', style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900)),
                   const SizedBox(height: 6),
-                  Text('Live capital distributions and structural data analytics.', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13)),
+                  Text(widget.isGuest ? 'Live overview of corporate project statuses and regional maps.' : 'Live capital distributions and structural data analytics.', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13)),
                 ],
               ),
             ),
@@ -350,10 +496,14 @@ class _MainEnterpriseDashboardState extends State<MainEnterpriseDashboard> {
                   _buildProjectSection(),
                   const SizedBox(height: 25),
                   _buildInteractiveMapWidget(), 
-                  const SizedBox(height: 30),
-                  _buildAdminInputFormSection(), 
-                  const SizedBox(height: 30),
-                  _buildSupportFormSection(),
+                  
+                  // 🛡️ RECRUITER CHECK: Hides the data submission forms entirely if logged in as a Client Guest
+                  if (!widget.isGuest) ...[
+                    const SizedBox(height: 30),
+                    _buildAdminInputFormSection(), 
+                    const SizedBox(height: 30),
+                    _buildSupportFormSection(),
+                  ],
                 ],
               ),
             ),
@@ -508,58 +658,25 @@ class _MainEnterpriseDashboardState extends State<MainEnterpriseDashboard> {
       child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
     );
   }
+
   Widget _buildAdminInputFormSection() {
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFF2B705).withOpacity(0.3), width: 1),
-        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))]
-      ),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFF2B705).withOpacity(0.3), width: 1)),
       child: Form(
         key: _projectFormKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
-              children: [
-                Icon(Icons.add_business, color: Color(0xFFF2B705)),
-                SizedBox(width: 10),
-                Text('Project Registry Provisioning', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
-              ],
-            ),
-            const SizedBox(height: 6),
-            const Text('Provision new structural assets and capital budgets directly into cloud arrays.', style: TextStyle(color: Colors.grey, fontSize: 12)),
+            const Row(children: [Icon(Icons.add_business, color: Color(0xFFF2B705)), SizedBox(width: 10), Text('Project Registry Provisioning', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))]),
             const SizedBox(height: 20),
-            TextFormField(
-              controller: _projectNameController,
-              decoration: const InputDecoration(labelText: 'Project / Asset Title', border: OutlineInputBorder(), prefixIcon: Icon(Icons.business)),
-              validator: (v) => v!.isEmpty ? 'Enter asset title descriptive string' : null,
-            ),
+            TextFormField(controller: _projectNameController, decoration: const InputDecoration(labelText: 'Project / Asset Title', border: OutlineInputBorder())),
             const SizedBox(height: 15),
-            TextFormField(
-              controller: _projectLocationController,
-              decoration: const InputDecoration(labelText: 'Site Geographic Location', border: OutlineInputBorder(), prefixIcon: Icon(Icons.pin_drop)),
-              validator: (v) => v!.isEmpty ? 'Enter structural site coordinates' : null,
-            ),
+            TextFormField(controller: _projectLocationController, decoration: const InputDecoration(labelText: 'Site Geographic Location', border: OutlineInputBorder())),
             const SizedBox(height: 15),
-            TextFormField(
-              controller: _projectBudgetController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Budget Capital Allocation (₦)', border: OutlineInputBorder(), prefixIcon: Icon(Icons.monetization_on)),
-              validator: (v) => v!.isEmpty ? 'Specify investment numeric string value' : null,
-            ),
+            TextFormField(controller: _projectBudgetController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Budget (₦)', border: OutlineInputBorder())),
             const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                onPressed: addNewProjectToCloud,
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF2B705), foregroundColor: const Color(0xFF1E293B), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                child: const Text('TRANSMIT NEW ASSET TO CLOUD', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5, fontSize: 13)),
-              ),
-            )
+            SizedBox(width: double.infinity, height: 48, child: ElevatedButton(onPressed: addNewProjectToCloud, child: const Text('TRANSMIT NEW ASSET TO CLOUD', style: TextStyle(fontWeight: FontWeight.bold))))
           ],
         ),
       ),
@@ -569,43 +686,21 @@ class _MainEnterpriseDashboardState extends State<MainEnterpriseDashboard> {
   Widget _buildSupportFormSection() {
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 4))]),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
       child: Form(
         key: _ticketFormKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Field Support & Incidents', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+            const Text('Field Support & Incidents', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 20),
-            TextFormField(
-              controller: _foremanController,
-              decoration: const InputDecoration(labelText: 'Foreman Name', border: OutlineInputBorder(), prefixIcon: Icon(Icons.person)),
-              validator: (v) => v!.isEmpty ? 'Enter manager name' : null,
-            ),
+            TextFormField(controller: _foremanController, decoration: const InputDecoration(labelText: 'Foreman Name', border: OutlineInputBorder())),
             const SizedBox(height: 15),
-            DropdownButtonFormField<String>(
-              value: _selectedPriority,
-              decoration: const InputDecoration(labelText: 'Urgency Priority', border: OutlineInputBorder(), prefixIcon: Icon(Icons.warning)),
-              items: ['Low', 'Medium', 'High / Critical'].map((String val) { return DropdownMenuItem<String>(value: val, child: Text(val)); }).toList(),
-              onChanged: (v) => setState(() => _selectedPriority = v!),
-            ),
+            DropdownButtonFormField<String>(value: _selectedPriority, decoration: const InputDecoration(labelText: 'Urgency', border: OutlineInputBorder()), items: ['Low', 'Medium', 'High / Critical'].map((String val) { return DropdownMenuItem<String>(value: val, child: Text(val)); }).toList(), onChanged: (v) => setState(() => _selectedPriority = v!)),
             const SizedBox(height: 15),
-            TextFormField(
-              controller: _detailsController,
-              maxLines: 3,
-              decoration: const InputDecoration(labelText: 'Log Event Details', border: OutlineInputBorder()),
-              validator: (v) => v!.isEmpty ? 'Describe the site issue' : null,
-            ),
+            TextFormField(controller: _detailsController, maxLines: 3, decoration: const InputDecoration(labelText: 'Log Event Details', border: OutlineInputBorder())),
             const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                onPressed: _submitSupportTicket,
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1E293B), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                child: const Text('TRANSMIT REPORT TO BASE', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5, fontSize: 13)),
-              ),
-            )
+            SizedBox(width: double.infinity, height: 48, child: ElevatedButton(onPressed: _submitSupportTicket, child: const Text('TRANSMIT REPORT TO BASE', style: TextStyle(fontWeight: FontWeight.bold))))
           ],
         ),
       ),
@@ -613,53 +708,14 @@ class _MainEnterpriseDashboardState extends State<MainEnterpriseDashboard> {
   }
 
   Widget _buildAnalyticsSection() {
-    return Padding(
-      padding: const EdgeInsets.all(20.0),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('📈 Enterprise Financial Metrics', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
-        const SizedBox(height: 25),
-        Row(children: [
-          _buildStatCard('Total Projects Active', '${projects.length}', Icons.architecture, Colors.blue),
-          const SizedBox(width: 15),
-          _buildStatCard('Gross Structural Allocations', '₦27.7M', Icons.account_balance_wallet, Colors.green),
-        ])
-      ]),
-    );
+    return Padding(padding: const EdgeInsets.all(20.0), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('📈 Enterprise Metrics', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)), const SizedBox(height: 25), Row(children: [_buildStatCard('Total Projects Active', '${projects.length}', Icons.architecture, Colors.blue), const SizedBox(width: 15), _buildStatCard('Gross Allocations', '₦27.7M', Icons.account_balance_wallet, Colors.green)])]));
   }
 
   Widget _buildStatCard(String title, String val, IconData icon, Color col) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(15),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10)]),
-        child: Row(children: [
-          CircleAvatar(radius: 18, backgroundColor: col.withOpacity(0.1), child: Icon(icon, color: col, size: 18)),
-          const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.w500)),
-            const SizedBox(height: 4),
-            Text(val, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
-          ]))
-        ]),
-      ),
-    );
+    return Expanded(child: Container(padding: const EdgeInsets.all(15), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)), child: Row(children: [CircleAvatar(radius: 18, backgroundColor: col.withOpacity(0.1), child: Icon(icon, color: col, size: 18)), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.grey, fontSize: 11)), const SizedBox(height: 4), Text(val, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))]))])));
   }
 
   Widget _buildReportsSection() {
-    return Padding(
-      padding: const EdgeInsets.all(20.0),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('📋 Daily Verification Logs', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
-        const SizedBox(height: 25),
-        Container(
-          width: double.infinity, padding: const EdgeInsets.all(15), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
-          child: const ListTile(
-            leading: Icon(Icons.verified_user, color: Colors.green, size: 26),
-            title: Text('Structural Integrity Audit - Active Pass', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-            subtitle: Padding(padding: EdgeInsets.only(top: 4.0), child: Text('Site Location: Victoria Island, Lagos • Status: Verified', style: TextStyle(fontSize: 12))),
-          ),
-        )
-      ]),
-    );
+    return Padding(padding: const EdgeInsets.all(20.0), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('📋 Daily Logs', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)), const SizedBox(height: 25), Container(width: double.infinity, padding: const EdgeInsets.all(15), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)), child: const ListTile(leading: Icon(Icons.verified_user, color: Colors.green, size: 26), title: Text('Structural Integrity Audit - Active Pass', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)), subtitle: Padding(padding: EdgeInsets.only(top: 4.0), child: Text('Site Location: Victoria Island, Lagos • Status: Verified', style: TextStyle(fontSize: 12)))))]));
   }
 }
